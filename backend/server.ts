@@ -10,6 +10,7 @@ import bcrypt from "bcryptjs";
 dotenv.config();
 
 const PORT = process.env.PORT || 3000;
+const serverPort = parseInt(String(PORT).replace(/\D/g, ''), 10) || 3000;
 const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URI || "mongodb://localhost:27017/syncro";
 const JWT_SECRET = process.env.JWT_SECRET || "temp_secret_key_for_dev_change_me_in_secrets";
 
@@ -225,18 +226,27 @@ async function startServer() {
     try {
       let taskQuery: any = {};
       if (req.user.role !== "admin") {
-        // Show all tasks in projects the member belongs to
-        const memberProjects = await Project.find({
-          $or: [{ owner: req.user.userId }, { members: req.user.userId }]
-        }).select("_id");
-        const projectIds = memberProjects.map((p: any) => p._id);
-        taskQuery = { project: { $in: projectIds } };
+        taskQuery = { assignee: req.user.userId };
       }
+
       const tasks = await Task.find(taskQuery)
         .populate("project", "name")
         .populate("assignee", "name email")
         .sort({ createdAt: -1 });
-      res.json(tasks);
+
+      // Calculate Statistics
+      const now = new Date();
+      const stats = {
+        total: tasks.length,
+        todo: tasks.filter(t => t.status === "todo").length,
+        inProgress: tasks.filter(t => t.status === "in-progress").length,
+        done: tasks.filter(t => t.status === "completed").length,
+        overdue: tasks.filter(t => {
+          return t.status !== "completed" && t.dueDate && new Date(t.dueDate) < now;
+        }).length
+      };
+
+      res.json({ tasks, stats });
     } catch (error) {
       next(error);
     }
@@ -254,9 +264,16 @@ async function startServer() {
 
   app.patch("/api/tasks/:id", authenticateToken, async (req: any, res, next) => {
     try {
-      const task = await Task.findByIdAndUpdate(req.params.id, req.body, { new: true });
+      const task = await Task.findById(req.params.id);
       if (!task) return res.status(404).json({ error: "Task not found" });
-      res.json(task);
+
+      // RBAC Check: Only Admin or the Assignee can update a task
+      if (req.user.role !== "admin" && task.assignee?.toString() !== req.user.userId) {
+        return res.status(403).json({ error: "You can only update tasks assigned to you" });
+      }
+
+      const updatedTask = await Task.findByIdAndUpdate(req.params.id, req.body, { new: true });
+      res.json(updatedTask);
     } catch (error) {
       next(error);
     }
@@ -285,7 +302,6 @@ async function startServer() {
     res.status(status).json({ error: err.message || "Internal server error" });
   });
 
-  const serverPort = Number(PORT);
   app.listen(serverPort, "0.0.0.0", () => {
     console.log(`🚀 TeamTrack Server is LIVE!`);
     console.log(`📡 Listening on: 0.0.0.0:${serverPort}`);
