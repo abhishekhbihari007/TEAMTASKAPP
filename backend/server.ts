@@ -21,6 +21,7 @@ async function startServer() {
 
   // Health check
   app.get("/api/health", (req, res) => {
+    console.log(`🩺 Health check pinged at ${new Date().toISOString()}`);
     res.json({ status: "operational", DB: mongoose.connection.readyState === 1 ? "Connected" : "Disconnected" });
   });
 
@@ -279,13 +280,16 @@ async function startServer() {
 
   // --- Global Error Handler ---
   app.use((err: any, req: any, res: any, next: any) => {
-    console.error(`[${new Date().toISOString()}] ${req.method} ${req.path} →`, err.message);
+    console.error(`❌ [${new Date().toISOString()}] ${req.method} ${req.path} →`, err.message);
     const status = err.status || err.statusCode || 500;
     res.status(status).json({ error: err.message || "Internal server error" });
   });
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  const serverPort = Number(PORT);
+  app.listen(serverPort, "0.0.0.0", () => {
+    console.log(`🚀 TeamTrack Server is LIVE!`);
+    console.log(`📡 Listening on: 0.0.0.0:${serverPort}`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   });
 }
 
