@@ -19,18 +19,31 @@ export default function Dashboard() {
 
   const loadDashboard = async () => {
     try {
-      const data = await api.tasks.dashboard();
-      setTasks(data);
+      const response = await api.tasks.dashboard();
+      // Handle both old array format (fallback) and new object format
+      const dashboardTasks = Array.isArray(response) ? response : response.tasks;
+      const dashboardStats = Array.isArray(response) ? null : response.stats;
+
+      setTasks(dashboardTasks);
       
-      const counts = data.reduce((acc: any, task: any) => {
-        acc.total++;
-        if (task.status === 'completed') acc.completed++;
-        else if (task.dueDate && new Date(task.dueDate) < new Date()) acc.overdue++;
-        else acc.pending++;
-        return acc;
-      }, { total: 0, pending: 0, completed: 0, overdue: 0 });
-      
-      setStats(counts);
+      if (dashboardStats) {
+        setStats({
+          total: dashboardStats.total,
+          pending: dashboardStats.todo + dashboardStats.inProgress,
+          completed: dashboardStats.done,
+          overdue: dashboardStats.overdue
+        });
+      } else {
+        // Fallback calculation if stats aren't provided by backend yet
+        const counts = dashboardTasks.reduce((acc: any, task: any) => {
+          acc.total++;
+          if (task.status === 'completed') acc.completed++;
+          else if (task.dueDate && new Date(task.dueDate) < new Date()) acc.overdue++;
+          else acc.pending++;
+          return acc;
+        }, { total: 0, pending: 0, completed: 0, overdue: 0 });
+        setStats(counts);
+      }
     } catch (error) {
       console.error(error);
     }
