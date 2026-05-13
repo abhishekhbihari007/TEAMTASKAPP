@@ -22,10 +22,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadDashboard();
-    if (user?.role === "admin") {
-      loadProjects();
-      loadUsers();
-    }
+    loadProjects();
+    loadUsers();
   }, []);
 
   const loadProjects = async () => {
@@ -39,6 +37,8 @@ export default function Dashboard() {
 
   const loadUsers = async () => {
     try {
+      // Members can also see users to assign tasks to (or just project members)
+      // For now, we fetch all users as the backend allows it, but filter for security if needed
       const data = await api.users.list();
       setUsers(data);
     } catch (error) {
@@ -87,7 +87,7 @@ export default function Dashboard() {
         ...newTask, 
         assignee: newTask.assignee || user?.id 
       });
-      toast.success("Task created and assigned");
+      toast.success("Task created successfully");
       setIsAddTaskOpen(false);
       setNewTask({ title: "", description: "", priority: "medium", dueDate: "", assignee: "", project: "" });
       loadDashboard();
@@ -116,94 +116,94 @@ export default function Dashboard() {
           <p className="text-xs text-zinc-500 uppercase tracking-widest font-bold mt-1">Real-time task tracking</p>
         </div>
         
-        {user?.role === "admin" && (
-          <Dialog open={isAddTaskOpen} onOpenChange={setIsAddTaskOpen}>
-            <DialogTrigger render={
-              <Button className="bg-indigo-600 hover:bg-indigo-500 rounded-xl px-6 h-11 text-xs font-bold uppercase tracking-widest gap-2 shadow-[0_0_20px_rgba(79,70,229,0.2)]">
-                <Plus className="w-4 h-4" />
-                Quick Assign
-              </Button>
-            } />
-            <DialogContent className="rounded-3xl bg-[#18181b] border-zinc-800 text-white p-8 max-w-md">
-              <DialogHeader>
-                <DialogTitle className="text-2xl font-bold text-white">Direct Task Assignment</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleCreateTask} className="space-y-4 pt-4">
+        <Dialog open={isAddTaskOpen} onOpenChange={setIsAddTaskOpen}>
+          <DialogTrigger render={
+            <Button className="bg-indigo-600 hover:bg-indigo-500 rounded-xl px-6 h-11 text-xs font-bold uppercase tracking-widest gap-2 shadow-[0_0_20px_rgba(79,70,229,0.2)]">
+              <Plus className="w-4 h-4" />
+              {user?.role === 'admin' ? 'Quick Assign' : 'New Task'}
+            </Button>
+          } />
+          <DialogContent className="rounded-3xl bg-[#18181b] border-zinc-800 text-white p-8 max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold text-white">
+                {user?.role === 'admin' ? 'Direct Task Assignment' : 'Create New Task'}
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleCreateTask} className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] uppercase font-bold text-zinc-500">Task Title</Label>
+                <Input 
+                  value={newTask.title} 
+                  onChange={e => setNewTask({...newTask, title: e.target.value})} 
+                  className="rounded-xl border-zinc-800 bg-zinc-900/50 focus-visible:ring-indigo-500 h-12"
+                  placeholder="e.g. Update Security Patch"
+                  required
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-bold text-zinc-500">Task Title</Label>
+                  <Label className="text-[10px] uppercase font-bold text-zinc-500">Select Project</Label>
+                  <select 
+                    value={newTask.project} 
+                    onChange={e => setNewTask({...newTask, project: e.target.value})}
+                    className="w-full h-11 px-3 border border-zinc-800 bg-zinc-900/50 rounded-xl text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
+                    required
+                  >
+                    <option value="">Select Project</option>
+                    {projects.map(p => (
+                      <option key={p._id} value={p._id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] uppercase font-bold text-zinc-500">Assign To</Label>
+                  <select 
+                    value={newTask.assignee} 
+                    onChange={e => setNewTask({...newTask, assignee: e.target.value})}
+                    className="w-full h-11 px-3 border border-zinc-800 bg-zinc-900/50 rounded-xl text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
+                  >
+                    <option value="">{user?.role === 'admin' ? 'Select User' : 'Assign to Me'}</option>
+                    {users.map(u => (
+                      <option key={u._id} value={u._id}>{u.name} {u._id === user?.id ? '(Me)' : ''}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-[10px] uppercase font-bold text-zinc-500">Priority</Label>
+                  <select 
+                    value={newTask.priority} 
+                    onChange={e => setNewTask({...newTask, priority: e.target.value})}
+                    className="w-full h-11 px-3 border border-zinc-800 bg-zinc-900/50 rounded-xl text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] uppercase font-bold text-zinc-500">Due Date</Label>
                   <Input 
-                    value={newTask.title} 
-                    onChange={e => setNewTask({...newTask, title: e.target.value})} 
-                    className="rounded-xl border-zinc-800 bg-zinc-900/50 focus-visible:ring-indigo-500 h-12"
-                    placeholder="e.g. Update Security Patch"
+                    type="date"
+                    value={newTask.dueDate} 
+                    onChange={e => setNewTask({...newTask, dueDate: e.target.value})} 
+                    className="rounded-xl border-zinc-800 bg-zinc-900/50 focus-visible:ring-indigo-500 h-11 text-xs"
                     required
                   />
                 </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] uppercase font-bold text-zinc-500">Select Project</Label>
-                    <select 
-                      value={newTask.project} 
-                      onChange={e => setNewTask({...newTask, project: e.target.value})}
-                      className="w-full h-11 px-3 border border-zinc-800 bg-zinc-900/50 rounded-xl text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
-                      required
-                    >
-                      <option value="">Select Project</option>
-                      {projects.map(p => (
-                        <option key={p._id} value={p._id}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] uppercase font-bold text-zinc-500">Assign To</Label>
-                    <select 
-                      value={newTask.assignee} 
-                      onChange={e => setNewTask({...newTask, assignee: e.target.value})}
-                      className="w-full h-11 px-3 border border-zinc-800 bg-zinc-900/50 rounded-xl text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
-                    >
-                      <option value="">Select User</option>
-                      {users.map(u => (
-                        <option key={u._id} value={u._id}>{u.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+              </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] uppercase font-bold text-zinc-500">Priority</Label>
-                    <select 
-                      value={newTask.priority} 
-                      onChange={e => setNewTask({...newTask, priority: e.target.value})}
-                      className="w-full h-11 px-3 border border-zinc-800 bg-zinc-900/50 rounded-xl text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] uppercase font-bold text-zinc-500">Due Date</Label>
-                    <Input 
-                      type="date"
-                      value={newTask.dueDate} 
-                      onChange={e => setNewTask({...newTask, dueDate: e.target.value})} 
-                      className="rounded-xl border-zinc-800 bg-zinc-900/50 focus-visible:ring-indigo-500 h-11 text-xs"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <DialogFooter className="pt-4">
-                  <Button type="submit" className="w-full h-12 bg-white text-black hover:bg-zinc-200 rounded-xl font-bold uppercase tracking-widest transition-all">
-                    Assign Task
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        )}
+              <DialogFooter className="pt-4">
+                <Button type="submit" className="w-full h-12 bg-white text-black hover:bg-zinc-200 rounded-xl font-bold uppercase tracking-widest transition-all">
+                  {user?.role === 'admin' ? 'Assign Task' : 'Create Task'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid grid-cols-12 gap-5">
