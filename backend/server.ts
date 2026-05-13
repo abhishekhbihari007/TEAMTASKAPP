@@ -9,7 +9,7 @@ import bcrypt from "bcryptjs";
 
 dotenv.config();
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URI || "mongodb://localhost:27017/syncro";
 const JWT_SECRET = process.env.JWT_SECRET || "temp_secret_key_for_dev_change_me_in_secrets";
 
@@ -56,14 +56,26 @@ async function startServer() {
   const Task = mongoose.model("Task", taskSchema);
 
   // MongoDB Connection
-  if (MONGODB_URI.includes("127.0.0.1") || MONGODB_URI.includes("localhost")) {
-    console.warn("⚠️  DATABASE WARNING: Running with local MongoDB fallback. If you are in production (Cloud Run), this WILL fail.");
-    console.warn("👉 Action Required: Add 'MONGODB_URI' to the AI Studio Secrets panel.");
+  const isLocal = MONGODB_URI.includes("127.0.0.1") || MONGODB_URI.includes("localhost");
+  const maskUri = (uri: string) => uri.replace(/\/\/(.*):(.*)@/, "//***:***@");
+
+  if (isLocal) {
+    console.warn("⚠️  DATABASE WARNING: Running with local MongoDB fallback.");
+    if (process.env.NODE_ENV === "production") {
+      console.error("❌ CRITICAL ERROR: Local MongoDB is not allowed in production.");
+      console.error("👉 Action Required: Add 'MONGO_URI' to your Railway service variables.");
+      // In production, we should ideally exit if the database is essential
+      // but to keep the health check alive for Railway, we just log the error.
+    } else {
+      console.warn("👉 Tip: For production, ensure 'MONGODB_URI' is set in your environment variables.");
+    }
   }
+
+  console.log(`Attempting to connect to: ${maskUri(MONGODB_URI)}`);
 
   mongoose.connect(MONGODB_URI)
     .then(async () => {
-      console.log("Connected to MongoDB Atlas");
+      console.log("✅ Connected to MongoDB Atlas");
       // Seed default admin for evaluation
       const adminEmail = "admin@task.io";
       const existingAdmin = await User.findOne({ email: adminEmail });
@@ -80,7 +92,10 @@ async function startServer() {
       }
     })
     .catch((err) => {
-      console.error("MongoDB connection error:", err.message);
+      console.error("❌ MongoDB connection error:", err.message);
+      if (isLocal && process.env.NODE_ENV === "production") {
+        console.error("💡 HINT: This error usually means the MONGO_URI variable is missing in Railway.");
+      }
     });
 
   // --- Middleware ---
